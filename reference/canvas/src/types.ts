@@ -46,4 +46,5 @@ export interface CanvasDoc {
   artifacts: Tile[]
   edges?: CanvasEdge[]
   groups?: CanvasGroup[]
+  projectKey?: string
 }

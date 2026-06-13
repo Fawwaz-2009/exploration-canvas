@@ -244,11 +244,29 @@ function list() {
   }
 }
 
+// initialize a project's canvas. `--blank` wipes any existing/demo content so a
+// fresh project starts clean.
+function init(args) {
+  const { flags } = parseFlags(args)
+  fs.mkdirSync(ARTIFACTS, { recursive: true })
+  const empty = { schema: 'infinite-canvas/1', version: 1, artifacts: [], groups: [], edges: [] }
+  if (flags.blank) {
+    for (const d of fs.readdirSync(ARTIFACTS)) fs.rmSync(path.join(ARTIFACTS, d), { recursive: true, force: true })
+    writeCanvas(empty)
+    console.log('✓ initialized a blank canvas (removed any demo/existing content)')
+  } else if (!fs.existsSync(CANVAS)) {
+    writeCanvas(empty)
+    console.log('✓ initialized canvas.json')
+  } else {
+    console.log('canvas.json already exists — use `canvas init --blank` to reset to empty')
+  }
+}
+
 // ---- dispatch --------------------------------------------------------------
 const [cmd, ...rest] = process.argv.slice(2)
-const cmds = { scaffold, place, fork, link, rm, list }
+const cmds = { init, scaffold, place, fork, link, rm, list }
 if (!cmd || !cmds[cmd]) {
-  console.log('usage: canvas <scaffold|place|fork|link|rm|list> ...')
+  console.log('usage: canvas <init|scaffold|place|fork|link|rm|list> ...')
   process.exit(cmd ? 1 : 0)
 }
 cmds[cmd](rest)

@@ -1,6 +1,7 @@
 import type { Plugin, ViteDevServer } from 'vite'
 import fs from 'node:fs'
 import path from 'node:path'
+import crypto from 'node:crypto'
 import { marked } from 'marked'
 
 // ---------------------------------------------------------------------------
@@ -17,6 +18,9 @@ const ROOT = process.cwd()
 const ARTIFACTS_DIR = path.join(ROOT, 'artifacts')
 const CANVAS_FILE = path.join(ROOT, 'canvas.json')
 const EMPTY_CANVAS = { schema: 'infinite-canvas/1', version: 1, artifacts: [], groups: [], edges: [] }
+// stable per-project key so canvas-only state (sticky notes, camera) is isolated
+// between projects that share localhost:5173
+const PROJECT_KEY = 'ec-' + crypto.createHash('sha1').update(ROOT).digest('hex').slice(0, 12)
 
 const MIME: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
@@ -62,7 +66,7 @@ function renderNote(innerHtml: string): string {
 }
 
 function buildCanvas() {
-  if (!fs.existsSync(CANVAS_FILE)) return EMPTY_CANVAS
+  if (!fs.existsSync(CANVAS_FILE)) return { ...EMPTY_CANVAS, projectKey: PROJECT_KEY }
   const canvas = readJSON(CANVAS_FILE)
   const artifacts = (canvas.artifacts || [])
     .map((a: any) => {
@@ -70,7 +74,7 @@ function buildCanvas() {
       return frame ? { ...a, ...frame } : null
     })
     .filter(Boolean)
-  return { ...canvas, artifacts }
+  return { ...canvas, projectKey: PROJECT_KEY, artifacts }
 }
 
 export function artifactHost(): Plugin {

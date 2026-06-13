@@ -7,8 +7,9 @@ import {
   type TLCreateShapePartial,
   type TLShape,
 } from 'tldraw'
+import { useEffect, useState } from 'react'
 import { ArtifactShapeUtil } from './ArtifactShape'
-import { fetchCanvas, saveFrame, saveCanvasMeta } from '../lib/api'
+import { fetchCanvas, saveFrame } from '../lib/api'
 import type { CanvasDoc, Tile } from '../types'
 
 const shapeUtils = [ArtifactShapeUtil]
@@ -113,57 +114,54 @@ function reconcile(editor: Editor, doc: CanvasDoc, initial: boolean) {
         } catch {}
       }
     }
-    if (doc.viewport && doc.viewport.zoom) editor.setCamera({ x: doc.viewport.x, y: doc.viewport.y, z: doc.viewport.zoom })
-    else editor.zoomToFit()
+    editor.zoomToFit()
   }
 }
 
 const wired = new WeakSet<Editor>()
 
-function onMount(editor: Editor) {
+function setup(editor: Editor, doc: CanvasDoc) {
   ;(window as any).__tldrawEditor = editor // dev hook
-  void (async () => {
-    const doc = await fetchCanvas()
-    reconcile(editor, doc, true)
-    if (wired.has(editor)) return
-    wired.add(editor)
+  // first ever load (empty persisted store) -> seed + group + fit; otherwise the
+  // store was restored (sticky notes, camera, groups persist via persistenceKey)
+  // and we just sync the file-backed artifacts onto it.
+  reconcile(editor, doc, editor.getCurrentPageShapeIds().size === 0)
+  if (wired.has(editor)) return
+  wired.add(editor)
 
-    // canvas -> files: a tile moved/resized -> write its frame.json (debounced)
-    const frameTimers = new Map<string, ReturnType<typeof setTimeout>>()
-    editor.sideEffects.registerAfterChangeHandler('shape', (_prev, next) => {
-      if (next.type !== 'artifact' && next.type !== 'image') return
-      const tileId = tileIdOf(next)
-      if (!tileId) return
-      const frame = { x: Math.round(next.x), y: Math.round(next.y), w: Math.round(next.props.w), h: Math.round(next.props.h) }
-      clearTimeout(frameTimers.get(tileId))
-      frameTimers.set(
-        tileId,
-        setTimeout(() => saveFrame(tileId, frame), 250),
-      )
-    })
+  // canvas -> files: a tile moved/resized -> write its frame.json (debounced).
+  // Native shapes (sticky notes etc.) have no tileId -> skipped; tldraw persists
+  // those itself via persistenceKey.
+  const frameTimers = new Map<string, ReturnType<typeof setTimeout>>()
+  editor.sideEffects.registerAfterChangeHandler('shape', (_prev, next) => {
+    if (next.type !== 'artifact' && next.type !== 'image') return
+    const tileId = tileIdOf(next)
+    if (!tileId) return
+    const frame = { x: Math.round(next.x), y: Math.round(next.y), w: Math.round(next.props.w), h: Math.round(next.props.h) }
+    clearTimeout(frameTimers.get(tileId))
+    frameTimers.set(tileId, setTimeout(() => saveFrame(tileId, frame), 250))
+  })
 
-    // canvas -> files: persist the viewport so the view survives a refresh
-    let camTimer: ReturnType<typeof setTimeout> | null = null
-    editor.sideEffects.registerAfterChangeHandler('camera', (_prev, next) => {
-      if (camTimer) clearTimeout(camTimer)
-      camTimer = setTimeout(() => saveCanvasMeta({ viewport: { x: Math.round(next.x), y: Math.round(next.y), zoom: next.z } }), 500)
-    })
-
-    // files -> canvas: when files change (agent scaffolds a tile, edits a frame), sync
-    try {
-      const es = new EventSource('/api/watch')
-      es.onmessage = async () => {
-        const fresh = await fetchCanvas()
-        reconcile(editor, fresh, false)
-      }
-    } catch {}
-  })()
+  // files -> canvas: when files change (agent scaffolds a tile, edits a frame), sync
+  try {
+    const es = new EventSource('/api/watch')
+    es.onmessage = async () => reconcile(editor, await fetchCanvas(), false)
+  } catch {}
 }
 
 export default function TldrawCanvas() {
+  const [doc, setDoc] = useState<CanvasDoc | null>(null)
+  useEffect(() => {
+    fetchCanvas().then(setDoc)
+  }, [])
+  if (!doc) return null
   return (
     <div style={{ position: 'fixed', inset: 0 }}>
-      <Tldraw shapeUtils={shapeUtils} onMount={onMount} />
+      <Tldraw
+        persistenceKey={doc.projectKey || 'exploration-canvas'}
+        shapeUtils={shapeUtils}
+        onMount={(editor) => setup(editor, doc)}
+      />
     </div>
   )
 }

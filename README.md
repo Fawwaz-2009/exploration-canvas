@@ -71,6 +71,7 @@ node bin/canvas.mjs rm my-idea
 
 | Command | Does |
 |---|---|
+| `init [--blank]` | initialize a project's canvas (`--blank` clears demo/existing content for a fresh start) |
 | `scaffold <id> --tier html\|spa\|document [--title] [--near <id>]` | create an artifact (folder + responsive skeleton + register it) |
 | `place <id> --xy X,Y \| --near <id>` | move a tile |
 | `fork <id> --as <newId>` | branch a direction to remix |
@@ -97,8 +98,9 @@ exploration-canvas/
 ## Status
 
 Working: the file-synced canvas, the live tiers (html / spa / document / image),
-interaction + scroll, native grouping, the CLI. Not yet built: the full-stack
-("server") tier (lazy-spawned process behind a reverse proxy — see
-`docs/founding-design.md` §8), and a polished empty/new-project bootstrap.
+interaction + scroll, native grouping, persistent sticky-note/text annotations
+(project-scoped), `canvas init` for a clean start, and the CLI. Not yet built:
+the full-stack ("server") tier (lazy-spawned process behind a reverse proxy — see
+`docs/founding-design.md` §8).
 
 Built with Claude Code.

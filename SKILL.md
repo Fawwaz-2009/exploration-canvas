@@ -38,7 +38,10 @@ boilerplate) correctly every time, and the live canvas picks the change up.
 ## Setup (once per project)
 Copy `reference/canvas/` into the project as `.canvas/`, then:
 ```bash
-cd .canvas && npm install && npm run dev   # serves http://localhost:5173
+cd .canvas
+npm install
+node bin/canvas.mjs init --blank   # start clean (clears the bundled Ember demo)
+npm run dev                        # serves http://localhost:5173
 ```
 Tell the human to open that URL. Then create artifacts from `.canvas/` with:
 ```bash
